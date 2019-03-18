@@ -250,7 +250,7 @@ void AC_AttitudeControl::input_quaternion(Quaternion attitude_desired_quat)
     // Call quaternion attitude controller
     attitude_controller_run_quat();
 }
-
+/**t fcm 0318 +**/
 Vector3f AC_AttitudeControl::transfer_function(float roll,float pitch,float yaw)
 {
     float xb,yb,xe,ye;
@@ -280,7 +280,7 @@ Vector3f AC_AttitudeControl::transfer_function(float roll,float pitch,float yaw)
     new_coordinate.z=0.0f;
     return new_coordinate;
 }
-
+/**t fcm 0318 +end**/
 
 // Command an euler roll and pitch angle and an euler yaw rate with angular velocity feedforward and smoothing
 void AC_AttitudeControl::input_euler_angle_roll_pitch_euler_rate_yaw(float euler_roll_angle_cd, float euler_pitch_angle_cd, float euler_yaw_rate_cds)
@@ -570,9 +570,11 @@ void AC_AttitudeControl::attitude_controller_run_quat()
     // Retrieve quaternion vehicle attitude
     // TODO add _ahrs.get_quaternion()
     Quaternion attitude_vehicle_quat;
+    /**t fcm 0318 +**/
     Quaternion new_coordinate_vehicle_q;
     Quaternion new_coordinate_target_q;
     Vector3f vehicle_attitude;
+    /**t fcm 0318 +end**/
     attitude_vehicle_quat.from_rotation_matrix(_ahrs.get_rotation_body_to_ned());
     /**t fcm 0224 +**/
     attitude_vehicle_quat.to_euler(vehicle_attitude.x,vehicle_attitude.y,vehicle_attitude.z);
@@ -591,15 +593,21 @@ void AC_AttitudeControl::attitude_controller_run_quat()
     /**t fcm 0224 +end**/
     // Compute attitude error
     Vector3f attitude_error_vector;
+    /**t fcm 0318 -**/
+    //thrust_heading_rotation_angles(_attitude_target_quat, attitude_vehicle_quat, attitude_error_vector, _thrust_error_angle);
+    /**t fcm 0318 -end**/
+    /**t fcm 0318 +**/
     thrust_heading_rotation_angles(new_coordinate_target_q, new_coordinate_vehicle_q, attitude_error_vector, _thrust_error_angle);
-
+    /**t fcm 0318 +end**/
     // Compute the angular velocity target from the attitude error
     _rate_target_ang_vel = update_ang_vel_target_from_att_error(attitude_error_vector);
 
     // Add feedforward term that attempts to ensure that roll and pitch errors rotate with the body frame rather than the reference frame.
     // todo: this should probably be a matrix that couples yaw as well.
+    /**t fcm 0318 -**/
     //_rate_target_ang_vel.x += attitude_error_vector.y * _ahrs.get_gyro().z;
     //_rate_target_ang_vel.y += -attitude_error_vector.x * _ahrs.get_gyro().z;
+    /**t fcm 0318 -end**/
     
     ang_vel_limit(_rate_target_ang_vel, radians(_ang_vel_roll_max), radians(_ang_vel_pitch_max), radians(_ang_vel_yaw_max));
 

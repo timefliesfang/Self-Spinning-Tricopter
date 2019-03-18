@@ -270,8 +270,8 @@ void AC_AttitudeControl_Multi::rate_controller_run()
 {
     // move throttle vs attitude mixing towards desired (called from here because this is conveniently called on every iteration)
     update_throttle_rpy_mix();
-
     Vector3f gyro_latest = _ahrs.get_gyro_latest();
+    /**t fcm 0318 +**/
     Vector3f motor_in,motor_in_copy,mix;
     motor_in.x=rate_target_to_motor_roll(0.0f, _rate_target_ang_vel.x);
     motor_in.y=rate_target_to_motor_pitch(0.0f, _rate_target_ang_vel.y);
@@ -287,20 +287,27 @@ void AC_AttitudeControl_Multi::rate_controller_run()
 
     mix.x = motor_in.x*cosf(heading + period + d)*a + motor_in.y*sinf(heading + period + d)*a + motor_in_copy.x*b;
     mix.y =-motor_in.x*sinf(heading + period + d)*a + motor_in.y*cosf(heading + period + d)*a + motor_in_copy.y*b;
-    mix.z = 0.0f;
-    /*static uint8_t counter;
-    counter++;
-    if(counter>50){
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "%.3f %.3f %.3f",mix.x,mix.y,mix.z);
-        counter = 0;    
-    }
-    _motors.set_roll(rate_target_to_motor_roll(gyro_latest.x, _rate_target_ang_vel.x));
-    _motors.set_pitch(rate_target_to_motor_pitch(gyro_latest.y, _rate_target_ang_vel.y));
-    _motors.set_yaw(rate_target_to_motor_yaw(gyro_latest.z, _rate_target_ang_vel.z));*/
 
+    float roll_mix = motor_in.x*cosf(heading + period + d) + motor_in.y*sinf(heading + period + d);
+    float pitch_mix =-motor_in.x*sinf(heading + period + d) + motor_in.y*cosf(heading + period + d);
+    mix.z = 0.0f;
+    static int counter;
+    counter++;
+    if(counter%50==0){
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "%d:*%.3f *%.3f *%.3f *%.3f *%.3f",counter,lean_angle,lean_angle_x,lean_angle_y,heading,period);
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "*%.3f *%.3f *%.3f *%.3f *%.3f *%.3f *%.3f",_rate_target_ang_vel.x,_rate_target_ang_vel.y,_rate_target_ang_vel.z,motor_in.x,motor_in.y,motor_in_copy.x,motor_in_copy.y);
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "*%.3f *%.3f",roll_mix,pitch_mix);
+    }
+  
     _motors.set_roll(mix.x);
     _motors.set_pitch(mix.y);
     _motors.set_yaw(mix.z);
+    /**t fcm 0318 +end**/
+    /**t fcm 0318 -**/
+      /*_motors.set_roll(rate_target_to_motor_roll(gyro_latest.x, _rate_target_ang_vel.x));
+    _motors.set_pitch(rate_target_to_motor_pitch(gyro_latest.y, _rate_target_ang_vel.y));
+    _motors.set_yaw(rate_target_to_motor_yaw(gyro_latest.z, _rate_target_ang_vel.z));*/
+    /**t fcm 0318 -end**/
 
     control_monitor_update();
 }

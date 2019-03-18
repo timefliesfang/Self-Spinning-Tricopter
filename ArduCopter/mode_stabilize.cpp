@@ -25,10 +25,10 @@ void Copter::ModeStabilize::run()
     float pilot_throttle_scaled;
 
     // if not armed set throttle to zero and exit immediately
-    /*if (!motors->armed() || ap.throttle_zero || !motors->get_interlock()) {
+    if (!motors->armed() || ap.throttle_zero || !motors->get_interlock()) {
         zero_throttle_and_relax_ac();
         return;
-    }*/
+    }
 
     // clear landing flag
     set_land_complete(false);
