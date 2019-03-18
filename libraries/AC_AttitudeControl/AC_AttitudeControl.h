@@ -299,6 +299,8 @@ public:
 
 protected:
 
+    Vector3f transfer_function(float roll,float pitch,float yaw);
+
     // Update rate_target_ang_vel using attitude_error_rot_vec_rad
     Vector3f update_ang_vel_target_from_att_error(Vector3f attitude_error_rot_vec_rad);
 
@@ -360,9 +362,13 @@ protected:
     // rate controller input smoothing time constant
     AP_Float            _input_tc;
 
+    AP_Float            smallest_angle;
+
     // Intersampling period in seconds
     float               _dt;
 
+    Vector3f new_coordinate_target;
+    Vector3f new_coordinate_vehicle;
     // This represents a 321-intrinsic rotation in NED frame to the target (setpoint)
     // attitude used in the attitude controller, in radians.
     Vector3f            _attitude_target_euler_angle;
@@ -389,6 +395,13 @@ protected:
 
     // This represents a quaternion attitude error in the body frame, used for inertial frame reset handling.
     Quaternion          _attitude_ang_error;
+
+    float               lean_angle;
+    float               heading;
+    float               period;
+    float               lean_angle_x;
+    float               lean_angle_y;
+    float               error;
 
     // The angle between the target thrust vector and the current thrust vector.
     float               _thrust_error_angle;

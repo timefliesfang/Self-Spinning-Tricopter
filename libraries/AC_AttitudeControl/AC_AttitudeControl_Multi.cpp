@@ -169,13 +169,15 @@ const AP_Param::GroupInfo AC_AttitudeControl_Multi::var_info[] = {
     // @Description: Throttle vs attitude control prioritisation used during manual flight (higher values mean we prioritise attitude control over throttle)
     // @Range: 0.1 0.9
     // @User: Advanced
-    AP_GROUPINFO("A", 7, AC_AttitudeControl_Multi, a, 1.0f),
+    AP_GROUPINFO("A", 7, AC_AttitudeControl_Multi, a, 0.6f),
     // @Param: THR_MIX_MAN
     // @DisplayName: Throttle Mix Manual
     // @Description: Throttle vs attitude control prioritisation used during manual flight (higher values mean we prioritise attitude control over throttle)
     // @Range: 0.1 0.9
     // @User: Advanced
-    AP_GROUPINFO("B", 8, AC_AttitudeControl_Multi, b, 1.0f),
+    AP_GROUPINFO("B", 8, AC_AttitudeControl_Multi, b, 0.6f),
+
+    AP_GROUPINFO("D", 9, AC_AttitudeControl_Multi, d, 0.0f),
 
     AP_GROUPEND
 };
@@ -271,17 +273,21 @@ void AC_AttitudeControl_Multi::rate_controller_run()
 
     Vector3f gyro_latest = _ahrs.get_gyro_latest();
     Vector3f motor_in,motor_in_copy,mix;
-    motor_in.x=rate_target_to_motor_roll(gyro_latest.x, _rate_target_ang_vel.x);
-    motor_in.y=rate_target_to_motor_pitch(gyro_latest.y, _rate_target_ang_vel.y);
-    motor_in.z=rate_target_to_motor_yaw(gyro_latest.z, _rate_target_ang_vel.z);
+    motor_in.x=rate_target_to_motor_roll(0.0f, _rate_target_ang_vel.x);
+    motor_in.y=rate_target_to_motor_pitch(0.0f, _rate_target_ang_vel.y);
+    motor_in.z=rate_target_to_motor_yaw(0.0f, _rate_target_ang_vel.z);
 
     motor_in_copy.x=rate_target_to_motor_roll_copy(gyro_latest.x, 0.0f);
     motor_in_copy.y=rate_target_to_motor_pitch_copy(gyro_latest.y, 0.0f);
     motor_in_copy.z=rate_target_to_motor_yaw_copy(gyro_latest.z, 0.0f);
 
-    mix.x = a*motor_in.x + b*motor_in_copy.x;
+    /*mix.x = a*motor_in.x + b*motor_in_copy.x;
     mix.y = a*motor_in.y + b*motor_in_copy.y;
-    mix.z = a*motor_in.z + b*motor_in_copy.z;
+    mix.z = a*motor_in.z + b*motor_in_copy.z;*/
+
+    mix.x = motor_in.x*cosf(heading + period + d)*a + motor_in.y*sinf(heading + period + d)*a + motor_in_copy.x*b;
+    mix.y =-motor_in.x*sinf(heading + period + d)*a + motor_in.y*cosf(heading + period + d)*a + motor_in_copy.y*b;
+    mix.z = 0.0f;
     /*static uint8_t counter;
     counter++;
     if(counter>50){

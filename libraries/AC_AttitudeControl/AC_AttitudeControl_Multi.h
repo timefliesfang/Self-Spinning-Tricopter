@@ -99,4 +99,5 @@ protected:
     AP_Float              _thr_mix_max;     // throttle vs attitude control prioritisation used during active flight (higher values mean we prioritise attitude control over throttle)
     AP_Float               a;
     AP_Float               b;
+    AP_Float               d;
 };
