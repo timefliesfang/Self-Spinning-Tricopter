@@ -106,6 +106,28 @@ void AC_PID::set_input_filter_all(float input)
     }
 }
 
+void AC_PID::set_input_filter_all_copy(float input)
+{
+    // don't process inf or NaN
+    if (!isfinite(input)) {
+        return;
+    }
+
+    // reset input filter to value received
+    if (_flags._reset_filter_copy) {
+        _flags._reset_filter_copy = false;
+        _input_copy = input;
+        _derivative_copy = 0.0f;
+    }
+
+    // update filter and calculate derivative
+    float input_filt_change = get_filt_alpha() * (input - _input_copy);
+    _input_copy = _input_copy + input_filt_change;
+    if (_dt > 0.0f) {
+        _derivative_copy = input_filt_change / _dt;
+    }
+}
+
 // set_input_filter_d - set input to PID controller
 //  only input to the D portion of the controller is filtered
 //  this should be called before any other calls to get_p, get_i or get_d
@@ -132,12 +154,42 @@ void AC_PID::set_input_filter_d(float input)
     _input = input;
 }
 
+// set_input_filter_d - set input to PID controller
+//  only input to the D portion of the controller is filtered
+//  this should be called before any other calls to get_p, get_i or get_d
+void AC_PID::set_input_filter_d_copy(float input)
+{
+    // don't process inf or NaN
+    if (!isfinite(input)) {
+        return;
+    }
+
+    // reset input filter to value received
+    if (_flags._reset_filter_copy) {
+        _flags._reset_filter_copy = false;
+        _input_copy = input;
+        _derivative_copy = 0.0f;
+    }
+
+    // update filter and calculate derivative
+    if (_dt > 0.0f) {
+        float derivative = (input - _input_copy) / _dt;
+        _derivative_copy = _derivative_copy + get_filt_alpha() * (derivative-_derivative_copy);
+    }
+
+    _input_copy = input;
+}
+
 float AC_PID::get_p()
 {
     _pid_info.P = (_input * _kp);
     return _pid_info.P;
 }
-
+float AC_PID::get_p_copy()
+{
+    _pid_info.P = (_input_copy * _kp);
+    return _pid_info.P;
+}
 float AC_PID::get_i()
 {
     if(!is_zero(_ki) && !is_zero(_dt)) {
@@ -152,14 +204,32 @@ float AC_PID::get_i()
     }
     return 0;
 }
-
+float AC_PID::get_i_copy()
+{
+    if(!is_zero(_ki) && !is_zero(_dt)) {
+        _integrator_copy += ((float)_input_copy * _ki) * _dt;
+        if (_integrator_copy < -_imax) {
+            _integrator_copy = -_imax;
+        } else if (_integrator_copy > _imax) {
+            _integrator_copy = _imax;
+        }
+        _pid_info.I = _integrator_copy;
+        return _integrator_copy;
+    }
+    return 0;
+}
 float AC_PID::get_d()
 {
     // derivative component
     _pid_info.D = (_kd * _derivative);
     return _pid_info.D;
 }
-
+float AC_PID::get_d_copy()
+{
+    // derivative component
+    _pid_info.D = (_kd * _derivative_copy);
+    return _pid_info.D;
+}
 float AC_PID::get_ff(float requested_rate)
 {
     _pid_info.FF = (float)requested_rate * _ff;

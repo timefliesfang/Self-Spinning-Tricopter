@@ -1,6 +1,7 @@
 #include "AC_AttitudeControl_Multi.h"
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Math/AP_Math.h>
+#include <GCS_MAVLink/GCS.h>
 
 // table of user settable parameters
 const AP_Param::GroupInfo AC_AttitudeControl_Multi::var_info[] = {
@@ -163,6 +164,19 @@ const AP_Param::GroupInfo AC_AttitudeControl_Multi::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("THR_MIX_MAN", 6, AC_AttitudeControl_Multi, _thr_mix_man, AC_ATTITUDE_CONTROL_MAN_DEFAULT),
 
+    // @Param: THR_MIX_MAN
+    // @DisplayName: Throttle Mix Manual
+    // @Description: Throttle vs attitude control prioritisation used during manual flight (higher values mean we prioritise attitude control over throttle)
+    // @Range: 0.1 0.9
+    // @User: Advanced
+    AP_GROUPINFO("A", 7, AC_AttitudeControl_Multi, a, 1.0f),
+    // @Param: THR_MIX_MAN
+    // @DisplayName: Throttle Mix Manual
+    // @Description: Throttle vs attitude control prioritisation used during manual flight (higher values mean we prioritise attitude control over throttle)
+    // @Range: 0.1 0.9
+    // @User: Advanced
+    AP_GROUPINFO("B", 8, AC_AttitudeControl_Multi, b, 1.0f),
+
     AP_GROUPEND
 };
 
@@ -256,9 +270,31 @@ void AC_AttitudeControl_Multi::rate_controller_run()
     update_throttle_rpy_mix();
 
     Vector3f gyro_latest = _ahrs.get_gyro_latest();
+    Vector3f motor_in,motor_in_copy,mix;
+    motor_in.x=rate_target_to_motor_roll(gyro_latest.x, _rate_target_ang_vel.x);
+    motor_in.y=rate_target_to_motor_pitch(gyro_latest.y, _rate_target_ang_vel.y);
+    motor_in.z=rate_target_to_motor_yaw(gyro_latest.z, _rate_target_ang_vel.z);
+
+    motor_in_copy.x=rate_target_to_motor_roll_copy(gyro_latest.x, 0.0f);
+    motor_in_copy.y=rate_target_to_motor_pitch_copy(gyro_latest.y, 0.0f);
+    motor_in_copy.z=rate_target_to_motor_yaw_copy(gyro_latest.z, 0.0f);
+
+    mix.x = a*motor_in.x + b*motor_in_copy.x;
+    mix.y = a*motor_in.y + b*motor_in_copy.y;
+    mix.z = a*motor_in.z + b*motor_in_copy.z;
+    /*static uint8_t counter;
+    counter++;
+    if(counter>50){
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "%.3f %.3f %.3f",mix.x,mix.y,mix.z);
+        counter = 0;    
+    }
     _motors.set_roll(rate_target_to_motor_roll(gyro_latest.x, _rate_target_ang_vel.x));
     _motors.set_pitch(rate_target_to_motor_pitch(gyro_latest.y, _rate_target_ang_vel.y));
-    _motors.set_yaw(rate_target_to_motor_yaw(gyro_latest.z, _rate_target_ang_vel.z));
+    _motors.set_yaw(rate_target_to_motor_yaw(gyro_latest.z, _rate_target_ang_vel.z));*/
+
+    _motors.set_roll(mix.x);
+    _motors.set_pitch(mix.y);
+    _motors.set_yaw(mix.z);
 
     control_monitor_update();
 }

@@ -311,6 +311,14 @@ protected:
     // Run the yaw angular velocity PID controller and return the output
     virtual float rate_target_to_motor_yaw(float rate_actual_rads, float rate_target_rads);
 
+    float rate_target_to_motor_roll_copy(float rate_actual_rads, float rate_target_rads);
+
+    // Run the pitch angular velocity PID controller and return the output
+    float rate_target_to_motor_pitch_copy(float rate_actual_rads, float rate_target_rads);
+
+    // Run the yaw angular velocity PID controller and return the output
+    float rate_target_to_motor_yaw_copy(float rate_actual_rads, float rate_target_rads);
+
     // Return angle in radians to be added to roll angle. Used by heli to counteract
     // tail rotor thrust in hover. Overloaded by AC_Attitude_Heli to return angle.
     virtual float get_roll_trim_rad() { return 0;}
@@ -367,6 +375,7 @@ protected:
     // This represents a quaternion rotation in NED frame to the target (setpoint)
     // attitude used in the attitude controller.
     Quaternion          _attitude_target_quat;
+    Quaternion          _attitude_target_quat_copy;
 
     // This represents the angular velocity of the target (setpoint) attitude used in
     // the attitude controller as an angular velocity vector, in radians per second in
@@ -376,13 +385,13 @@ protected:
     // This represents the angular velocity in radians per second in the body frame, used in the angular
     // velocity controller.
     Vector3f            _rate_target_ang_vel;
+    Vector3f            _rate_target_ang_vel_copy;
 
     // This represents a quaternion attitude error in the body frame, used for inertial frame reset handling.
     Quaternion          _attitude_ang_error;
 
     // The angle between the target thrust vector and the current thrust vector.
     float               _thrust_error_angle;
-
     // throttle provided as input to attitude controller.  This does not include angle boost.
     float               _throttle_in = 0.0f;
 

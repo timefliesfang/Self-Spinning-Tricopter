@@ -290,6 +290,7 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_euler_rate_yaw(float euler
         _attitude_target_euler_angle.z += euler_yaw_rate*_dt;
         // Compute quaternion target attitude
         _attitude_target_quat.from_euler(_attitude_target_euler_angle.x, _attitude_target_euler_angle.y, _attitude_target_euler_angle.z);
+        _attitude_target_quat_copy = _attitude_target_quat;
 
         // Set rate feedforward requests to zero
         _attitude_target_euler_rate = Vector3f(0.0f, 0.0f, 0.0f);
@@ -538,7 +539,6 @@ void AC_AttitudeControl::attitude_controller_run_quat()
     // TODO add _ahrs.get_quaternion()
     Quaternion attitude_vehicle_quat;
     attitude_vehicle_quat.from_rotation_matrix(_ahrs.get_rotation_body_to_ned());
-
     // Compute attitude error
     Vector3f attitude_error_vector;
     thrust_heading_rotation_angles(_attitude_target_quat, attitude_vehicle_quat, attitude_error_vector, _thrust_error_angle);
@@ -586,6 +586,7 @@ void AC_AttitudeControl::attitude_controller_run_quat()
 
     // Record error to handle EKF resets
     _attitude_ang_error = attitude_vehicle_quat.inverse() * _attitude_target_quat;
+    _rate_target_ang_vel_copy = _rate_target_ang_vel;
 }
 
 // thrust_heading_rotation_angles - calculates two ordered rotations to move the att_from_quat quaternion to the att_to_quat quaternion.
@@ -841,6 +842,28 @@ float AC_AttitudeControl::rate_target_to_motor_roll(float rate_actual_rads, floa
     return constrain_float(output, -1.0f, 1.0f);
 }
 
+float AC_AttitudeControl::rate_target_to_motor_roll_copy(float rate_actual_rads, float rate_target_rads)
+{
+    float rate_error_rads = rate_target_rads - rate_actual_rads;
+
+    // pass error to PID controller
+    get_rate_roll_pid().set_input_filter_d_copy(rate_error_rads);
+    get_rate_roll_pid().set_desired_rate(rate_target_rads);
+
+    float integrator = get_rate_roll_pid().get_integrator_copy();
+
+    // Ensure that integrator can only be reduced if the output is saturated
+    if (!_motors.limit.roll_pitch || ((is_positive(integrator) && is_negative(rate_error_rads)) || (is_negative(integrator) && is_positive(rate_error_rads)))) {
+        integrator = get_rate_roll_pid().get_i_copy();
+    }
+
+    // Compute output in range -1 ~ +1
+    float output = get_rate_roll_pid().get_p_copy() + integrator + get_rate_roll_pid().get_d_copy() + get_rate_roll_pid().get_ff(rate_target_rads);
+
+    // Constrain output
+    return constrain_float(output, -1.0f, 1.0f);
+}
+
 // Run the pitch angular velocity PID controller and return the output
 float AC_AttitudeControl::rate_target_to_motor_pitch(float rate_actual_rads, float rate_target_rads)
 {
@@ -864,6 +887,28 @@ float AC_AttitudeControl::rate_target_to_motor_pitch(float rate_actual_rads, flo
     return constrain_float(output, -1.0f, 1.0f);
 }
 
+float AC_AttitudeControl::rate_target_to_motor_pitch_copy(float rate_actual_rads, float rate_target_rads)
+{
+    float rate_error_rads = rate_target_rads - rate_actual_rads;
+
+    // pass error to PID controller
+    get_rate_pitch_pid().set_input_filter_d_copy(rate_error_rads);
+    get_rate_pitch_pid().set_desired_rate(rate_target_rads);
+
+    float integrator = get_rate_pitch_pid().get_integrator_copy();
+
+    // Ensure that integrator can only be reduced if the output is saturated
+    if (!_motors.limit.roll_pitch || ((is_positive(integrator) && is_negative(rate_error_rads)) || (is_negative(integrator) && is_positive(rate_error_rads)))) {
+        integrator = get_rate_pitch_pid().get_i_copy();
+    }
+
+    // Compute output in range -1 ~ +1
+    float output = get_rate_pitch_pid().get_p_copy() + integrator + get_rate_pitch_pid().get_d_copy() + get_rate_pitch_pid().get_ff(rate_target_rads);
+
+    // Constrain output
+    return constrain_float(output, -1.0f, 1.0f);
+}
+
 // Run the yaw angular velocity PID controller and return the output
 float AC_AttitudeControl::rate_target_to_motor_yaw(float rate_actual_rads, float rate_target_rads)
 {
@@ -882,6 +927,29 @@ float AC_AttitudeControl::rate_target_to_motor_yaw(float rate_actual_rads, float
 
     // Compute output in range -1 ~ +1
     float output = get_rate_yaw_pid().get_p() + integrator + get_rate_yaw_pid().get_d() + get_rate_yaw_pid().get_ff(rate_target_rads);
+
+    // Constrain output
+    return constrain_float(output, -1.0f, 1.0f);
+}
+
+// Run the yaw angular velocity PID controller and return the output
+float AC_AttitudeControl::rate_target_to_motor_yaw_copy(float rate_actual_rads, float rate_target_rads)
+{
+    float rate_error_rads = rate_target_rads - rate_actual_rads;
+
+    // pass error to PID controller
+    get_rate_yaw_pid().set_input_filter_all_copy(rate_error_rads);
+    get_rate_yaw_pid().set_desired_rate(rate_target_rads);
+
+    float integrator = get_rate_yaw_pid().get_integrator_copy();
+
+    // Ensure that integrator can only be reduced if the output is saturated
+    if (!_motors.limit.yaw || ((is_positive(integrator) && is_negative(rate_error_rads)) || (is_negative(integrator) && is_positive(rate_error_rads)))) {
+        integrator = get_rate_yaw_pid().get_i_copy();
+    }
+
+    // Compute output in range -1 ~ +1
+    float output = get_rate_yaw_pid().get_p_copy() + integrator + get_rate_yaw_pid().get_d_copy() + get_rate_yaw_pid().get_ff(rate_target_rads);
 
     // Constrain output
     return constrain_float(output, -1.0f, 1.0f);

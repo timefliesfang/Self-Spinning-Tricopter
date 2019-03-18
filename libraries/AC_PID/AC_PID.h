@@ -27,18 +27,23 @@ public:
     //  input is filtered before the PID controllers are run
     //  this should be called before any other calls to get_p, get_i or get_d
     void        set_input_filter_all(float input);
+    void        set_input_filter_all_copy(float input);
 
     // set_input_filter_d - set input to PID controller
     //  only input to the D portion of the controller is filtered
     //  this should be called before any other calls to get_p, get_i or get_d
     void        set_input_filter_d(float input);
+    void        set_input_filter_d_copy(float input);
 
     // get_pid - get results from pid controller
     float       get_pid();
     float       get_pi();
     float       get_p();
+    float       get_p_copy();
     float       get_i();
+    float       get_i_copy();
     float       get_d();
+    float       get_d_copy();
     float       get_ff(float requested_rate);
     
     // reset_I - reset the integrator
@@ -74,7 +79,9 @@ public:
     void        ff(const float v) { _ff.set(v); }
 
     float       get_integrator() const { return _integrator; }
+    float       get_integrator_copy() const { return _integrator_copy; }
     void        set_integrator(float i) { _integrator = i; }
+    void        set_integrator_copy(float i) { _integrator_copy = i; }
 
     // set the designed rate (for logging purposes)
     void        set_desired_rate(float desired) { _pid_info.desired = desired; }
@@ -97,13 +104,17 @@ protected:
     // flags
     struct ac_pid_flags {
         bool        _reset_filter : 1;    // true when input filter should be reset during next call to set_input
+        bool        _reset_filter_copy : 1;    // true when input filter should be reset during next call to set_input
     } _flags;
 
     // internal variables
     float           _dt;                    // timestep in seconds
     float           _integrator;            // integrator value
+    float           _integrator_copy;            // integrator value
     float           _input;                 // last input for derivative
+    float           _input_copy;
     float           _derivative;            // last derivative for low-pass filter
+    float           _derivative_copy;            // last derivative for low-pass filter
 
     DataFlash_Class::PID_Info        _pid_info;
 };
