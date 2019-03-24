@@ -143,7 +143,13 @@ const AP_Param::GroupInfo AC_AttitudeControl::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("INPUT_TC", 20, AC_AttitudeControl, _input_tc, AC_ATTITUDE_CONTROL_INPUT_TC_DEFAULT),
 
-    AP_GROUPINFO("MIN_ANG", 21, AC_AttitudeControl, smallest_angle, 0.02f),
+    AP_GROUPINFO("MIN_ANG", 21, AC_AttitudeControl, smallest_angle, 5),
+
+    AP_GROUPINFO("K", 22, AC_AttitudeControl, k, 1.0f),
+
+    AP_GROUPINFO("TAG", 23, AC_AttitudeControl, _tag, 0),
+
+    AP_GROUPINFO("CH_YAW", 24, AC_AttitudeControl, channel_yaw, 1.0f),
 
     AP_GROUPEND
 };
@@ -262,8 +268,9 @@ Vector3f AC_AttitudeControl::transfer_function(float roll,float pitch,float yaw)
     ye=xb*sinf(yaw)+yb*cosf(yaw);
     //ze=zb;
     lean_angle = acosf(cosf(pitch)*cosf(roll));
-    lean_angle_x = asinf(xb*cosf(yaw) - yb *sinf(yaw));
-    lean_angle_y = asinf(xb *sinf(yaw)+ yb *cosf(yaw));
+
+    lean_angle_x = asinf(ye);
+    lean_angle_y = asinf(-xe/cosf(lean_angle_x));
 
     if(xe>0)
         heading=atanf(ye/xe)+M_PI;
@@ -272,9 +279,11 @@ Vector3f AC_AttitudeControl::transfer_function(float roll,float pitch,float yaw)
     else
         heading=atanf(ye/xe)+2*M_PI;
     if(pitch>0)
-        period=atanf(sinf(roll)/tanf(pitch));
-    else
-        period=atanf(sinf(roll)/tanf(pitch))+M_PI;
+        period = atanf(sinf(roll)/tanf(pitch));
+    else if(pitch<0)
+        period = atanf(sinf(roll)/tanf(pitch))+M_PI;
+    else    
+        period = M_PI/2.0f*roll/abs(roll);
     new_coordinate.x=lean_angle_x;
     new_coordinate.y=lean_angle_y;
     new_coordinate.z=0.0f;
@@ -320,7 +329,7 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_euler_rate_yaw(float euler
         // When feedforward is not enabled, the target euler angle is input into the target and the feedforward rate is zeroed.
         _attitude_target_euler_angle.x = euler_roll_angle;
         _attitude_target_euler_angle.y = euler_pitch_angle;
-        _attitude_target_euler_angle.z += euler_yaw_rate*_dt;
+        _attitude_target_euler_angle.z = euler_yaw_rate * channel_yaw;
         // Compute quaternion target attitude
         _attitude_target_quat.from_euler(_attitude_target_euler_angle.x, _attitude_target_euler_angle.y, _attitude_target_euler_angle.z);
 
@@ -579,17 +588,30 @@ void AC_AttitudeControl::attitude_controller_run_quat()
     /**t fcm 0224 +**/
     attitude_vehicle_quat.to_euler(vehicle_attitude.x,vehicle_attitude.y,vehicle_attitude.z);
     new_coordinate_vehicle=transfer_function(vehicle_attitude.x,vehicle_attitude.y,vehicle_attitude.z);
-    if(lean_angle>smallest_angle)
+    if(lean_angle>smallest_angle/180*M_PI)
     {
         error = period - vehicle_attitude.z;
     }
     else
     {
         period = vehicle_attitude.z + error;
-        heading = 0;
+        heading = vehicle_attitude.z - period;
     }
     new_coordinate_vehicle_q.from_euler(new_coordinate_vehicle.x,new_coordinate_vehicle.y,0.0f);
-    new_coordinate_target_q.from_euler(_attitude_target_euler_angle.x,_attitude_target_euler_angle.y,0.0f);
+    
+    float target_p,target_r;
+    target_p = _attitude_target_euler_angle.y + (acosf(cosf(lean_angle)/cosf(_attitude_target_euler_angle.z))-lean_angle)*cosf(heading)+k*_attitude_target_euler_angle.z*sinf(heading);
+    target_r = _attitude_target_euler_angle.x + (acosf(cosf(lean_angle)/cosf(_attitude_target_euler_angle.z))-lean_angle)*sinf(heading)-k*_attitude_target_euler_angle.z*sinf(heading);
+    //_attitude_target_euler_angle.z = 0.0f;
+    static int counter1;
+    counter1++;
+    if(counter1%50==0){
+        if(_tag==6)
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "R:%.0f  P:%.0f  Y:%.0f  T_R:%.0f  T_P:%.0f",_attitude_target_euler_angle.x/M_PI*180,_attitude_target_euler_angle.y/M_PI*180,_attitude_target_euler_angle.z/M_PI*180,target_r/M_PI*180,target_p/M_PI*180);
+        
+            //gcs().send_text(MAV_SEVERITY_CRITICAL, "T_R:%.0f  T_P:%.0f",target_r/M_PI*180,target_p/M_PI*180);
+    }
+    new_coordinate_target_q.from_euler(target_r,target_p,0.0f);
     /**t fcm 0224 +end**/
     // Compute attitude error
     Vector3f attitude_error_vector;
@@ -890,7 +912,7 @@ float AC_AttitudeControl::rate_target_to_motor_roll(float rate_actual_rads, floa
     float output = get_rate_roll_pid().get_p() + integrator + get_rate_roll_pid().get_d() + get_rate_roll_pid().get_ff(rate_target_rads);
 
     // Constrain output
-    return constrain_float(output, -1.0f, 1.0f);
+    //return constrain_float(output, -1.0f, 1.0f);
 }
 
 float AC_AttitudeControl::rate_target_to_motor_roll_copy(float rate_actual_rads, float rate_target_rads)
@@ -912,7 +934,7 @@ float AC_AttitudeControl::rate_target_to_motor_roll_copy(float rate_actual_rads,
     float output = get_rate_roll_pid().get_p_copy() + integrator + get_rate_roll_pid().get_d_copy() + get_rate_roll_pid().get_ff(rate_target_rads);
 
     // Constrain output
-    return constrain_float(output, -1.0f, 1.0f);
+    //return constrain_float(output, -1.0f, 1.0f);
 }
 
 // Run the pitch angular velocity PID controller and return the output
@@ -935,7 +957,7 @@ float AC_AttitudeControl::rate_target_to_motor_pitch(float rate_actual_rads, flo
     float output = get_rate_pitch_pid().get_p() + integrator + get_rate_pitch_pid().get_d() + get_rate_pitch_pid().get_ff(rate_target_rads);
 
     // Constrain output
-    return constrain_float(output, -1.0f, 1.0f);
+    //return constrain_float(output, -1.0f, 1.0f);
 }
 
 float AC_AttitudeControl::rate_target_to_motor_pitch_copy(float rate_actual_rads, float rate_target_rads)
@@ -957,7 +979,7 @@ float AC_AttitudeControl::rate_target_to_motor_pitch_copy(float rate_actual_rads
     float output = get_rate_pitch_pid().get_p_copy() + integrator + get_rate_pitch_pid().get_d_copy() + get_rate_pitch_pid().get_ff(rate_target_rads);
 
     // Constrain output
-    return constrain_float(output, -1.0f, 1.0f);
+    //return constrain_float(output, -1.0f, 1.0f);
 }
 
 // Run the yaw angular velocity PID controller and return the output
@@ -980,7 +1002,7 @@ float AC_AttitudeControl::rate_target_to_motor_yaw(float rate_actual_rads, float
     float output = get_rate_yaw_pid().get_p() + integrator + get_rate_yaw_pid().get_d() + get_rate_yaw_pid().get_ff(rate_target_rads);
 
     // Constrain output
-    return constrain_float(output, -1.0f, 1.0f);
+    //return constrain_float(output, -1.0f, 1.0f);
 }
 
 // Run the yaw angular velocity PID controller and return the output
@@ -1003,7 +1025,7 @@ float AC_AttitudeControl::rate_target_to_motor_yaw_copy(float rate_actual_rads, 
     float output = get_rate_yaw_pid().get_p_copy() + integrator + get_rate_yaw_pid().get_d_copy() + get_rate_yaw_pid().get_ff(rate_target_rads);
 
     // Constrain output
-    return constrain_float(output, -1.0f, 1.0f);
+    //return constrain_float(output, -1.0f, 1.0f);
 }
 
 // Enable or disable body-frame feed forward

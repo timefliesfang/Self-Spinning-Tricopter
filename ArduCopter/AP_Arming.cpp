@@ -510,13 +510,13 @@ bool AP_Arming_Copter::arm_checks(bool display_failure, bool arming_from_gcs)
         return false;
     }
 
-#ifndef ALLOW_ARM_NO_COMPASS
+/*#ifndef ALLOW_ARM_NO_COMPASS
     // check compass health
     if (!_compass.healthy()) {
         check_failed(ARMING_CHECK_NONE, display_failure, "Compass not healthy");
         return false;
     }
-#endif
+#endif*/
 
     if (_compass.is_calibrating()) {
         check_failed(ARMING_CHECK_NONE, display_failure, "Compass calibration running");

@@ -43,8 +43,10 @@ void Copter::ModeStabilize::run()
     // convert pilot input to lean angles
     get_pilot_desired_lean_angles(target_roll, target_pitch, aparm.angle_max, aparm.angle_max);
 
+    get_pilot_desired_yaw_angles(target_yaw_rate, aparm.angle_max, aparm.angle_max);
+
     // get pilot's desired yaw rate
-    target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
+    //target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
 
     // get pilot's desired throttle
     pilot_throttle_scaled = get_pilot_desired_throttle(channel_throttle->get_control_in());

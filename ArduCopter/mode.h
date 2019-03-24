@@ -103,6 +103,7 @@ protected:
 
     // pilot input processing
     void get_pilot_desired_lean_angles(float &roll_out, float &pitch_out, float angle_max, float angle_limit) const;
+    void get_pilot_desired_yaw_angles(float &yaw_out, float angle_max, float angle_limit) const;
 
     // takeoff support
     bool takeoff_triggered(float target_climb_rate) const;

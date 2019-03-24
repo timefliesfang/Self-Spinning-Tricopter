@@ -31,7 +31,7 @@
 
 #define AC_ATTITUDE_400HZ_DT                            0.0025f // delta time in seconds for 400hz update rate
 
-#define AC_ATTITUDE_CONTROL_RATE_BF_FF_DEFAULT          1       // body-frame rate feedforward enabled by default
+#define AC_ATTITUDE_CONTROL_RATE_BF_FF_DEFAULT          0       // body-frame rate feedforward enabled by default
 
 #define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_TC_DEFAULT      1.0f    // Time constant used to limit lean angle so that vehicle does not lose altitude
 #define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_THROTTLE_MAX    0.8f    // Max throttle used to limit lean angle so that vehicle does not lose altitude
@@ -364,6 +364,9 @@ protected:
     AP_Float            _input_tc;
 
     AP_Float            smallest_angle;
+    AP_Float            k;
+    AP_Float            channel_yaw;
+    AP_Int8               _tag;
 
     // Intersampling period in seconds
     float               _dt;
@@ -402,7 +405,7 @@ protected:
     float               period;
     float               lean_angle_x;
     float               lean_angle_y;
-    float               error;
+    float               error = 0.0f;
 
     // The angle between the target thrust vector and the current thrust vector.
     float               _thrust_error_angle;

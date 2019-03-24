@@ -148,7 +148,9 @@ void AP_AHRS_NavEKF::update_EKF2(void)
             start_time_ms = AP_HAL::millis();
         }
         if (AP_HAL::millis() - start_time_ms > startup_delay_ms || _force_ekf) {
-            _ekf2_started = EKF2.InitialiseFilter();
+            //_ekf2_started = EKF2.InitialiseFilter();
+            /**t fcm 0322 +**/
+            _ekf2_started = 0;
             if (_force_ekf) {
                 return;
             }
@@ -221,7 +223,9 @@ void AP_AHRS_NavEKF::update_EKF3(void)
             start_time_ms = AP_HAL::millis();
         }
         if (AP_HAL::millis() - start_time_ms > startup_delay_ms || _force_ekf) {
-            _ekf3_started = EKF3.InitialiseFilter();
+            //_ekf3_started = EKF3.InitialiseFilter();
+            /**t fcm 0322 +**/
+            _ekf3_started = 0;
             if (_force_ekf) {
                 return;
             }
@@ -954,6 +958,9 @@ AP_AHRS_NavEKF::EKF_TYPE AP_AHRS_NavEKF::active_EKF_type(void) const
     switch (ekf_type()) {
     case 0:
         return EKF_TYPE_NONE;
+        /**t fcm 0322 +**/
+        break;
+        /**t fcm 0322 +end**/
 
     case 2: {
         // do we have an EKF2 yet?

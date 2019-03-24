@@ -518,8 +518,11 @@ void Copter::update_simple_mode(void)
     }
 
     // rotate roll, pitch input from north facing to vehicle's perspective
-    channel_roll->set_control_in(rollx*ahrs.cos_yaw() + pitchx*ahrs.sin_yaw());
-    channel_pitch->set_control_in(-rollx*ahrs.sin_yaw() + pitchx*ahrs.cos_yaw());
+    //channel_roll->set_control_in(rollx*ahrs.cos_yaw() + pitchx*ahrs.sin_yaw());
+    //channel_pitch->set_control_in(-rollx*ahrs.sin_yaw() + pitchx*ahrs.cos_yaw());
+
+    channel_roll->set_control_in(rollx);
+    channel_pitch->set_control_in(pitchx);
 }
 
 // update_super_simple_bearing - adjusts simple bearing based on location

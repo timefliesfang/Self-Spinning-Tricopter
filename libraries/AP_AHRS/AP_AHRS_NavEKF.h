@@ -266,7 +266,10 @@ private:
     EKF_TYPE active_EKF_type(void) const;
 
     bool always_use_EKF() const {
-        return _ekf_flags & FLAG_ALWAYS_USE_EKF;
+        //return _ekf_flags & FLAG_ALWAYS_USE_EKF;
+        /**t fcm 0322 +**/
+        return 0;
+        /**t fcm 0322 +**/
     }
 
     NavEKF2 &EKF2;

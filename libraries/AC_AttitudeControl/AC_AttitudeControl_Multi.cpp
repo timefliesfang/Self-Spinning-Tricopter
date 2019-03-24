@@ -288,17 +288,33 @@ void AC_AttitudeControl_Multi::rate_controller_run()
     mix.x = motor_in.x*cosf(heading + period + d)*a + motor_in.y*sinf(heading + period + d)*a + motor_in_copy.x*b;
     mix.y =-motor_in.x*sinf(heading + period + d)*a + motor_in.y*cosf(heading + period + d)*a + motor_in_copy.y*b;
 
-    float roll_mix = motor_in.x*cosf(heading + period + d) + motor_in.y*sinf(heading + period + d);
-    float pitch_mix =-motor_in.x*sinf(heading + period + d) + motor_in.y*cosf(heading + period + d);
+    float roll1 = motor_in.x*cosf(heading + period + d) + motor_in.y*sinf(heading + period + d);
+    float pitch1 =-motor_in.x*sinf(heading + period + d) + motor_in.y*cosf(heading + period + d);
     mix.z = 0.0f;
     static int counter;
     counter++;
     if(counter%50==0){
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "%d:*%.3f *%.3f *%.3f *%.3f *%.3f",counter,lean_angle,lean_angle_x,lean_angle_y,heading,period);
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "*%.3f *%.3f *%.3f *%.3f *%.3f *%.3f *%.3f",_rate_target_ang_vel.x,_rate_target_ang_vel.y,_rate_target_ang_vel.z,motor_in.x,motor_in.y,motor_in_copy.x,motor_in_copy.y);
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "*%.3f *%.3f",roll_mix,pitch_mix);
+        if(_tag==0)
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "R:%.3f  P:%.3f",mix.x,mix.y);
+        else if(_tag==1)
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "R1:%.3f  P1:%.3f",roll1,pitch1);
+        else if(_tag==2)
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "R2:%.3f  P2:%.3f",motor_in_copy.x,motor_in_copy.y);
+        else if(_tag==3){
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "%d:*%.3f *%.3f *%.3f *%.3f",counter,roll1,pitch1);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "*%.3f  *%.3f",motor_in_copy.x,motor_in_copy.y);
+        }   
+        else if(_tag==4)
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "l:%.0f x:%.0f y:%.0f p:%.0f h:%.0f",lean_angle*180/M_PI,lean_angle_x*180/M_PI,lean_angle_y*180/M_PI,period*180/M_PI,heading*180/M_PI);
+        else if(_tag==5){
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "%d:*%.0f  *%.0f  *%.0f  *%.0f",counter,lean_angle_x*180/M_PI,lean_angle_y*180/M_PI,period*180/M_PI,heading*180/M_PI);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "*%.3f  *%.3f  *%.3f  *%.3f",roll1,pitch1,motor_in_copy.x,motor_in_copy.y);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "*%.3f  *%.3f",mix.x,mix.y);
+        }
     }
-  
+    constrain_float(mix.x, -1.0f, 1.0f);
+    constrain_float(mix.y, -1.0f, 1.0f);
+    constrain_float(mix.z, -1.0f, 1.0f);
     _motors.set_roll(mix.x);
     _motors.set_pitch(mix.y);
     _motors.set_yaw(mix.z);

@@ -100,4 +100,5 @@ protected:
     AP_Float               a;
     AP_Float               b;
     AP_Float               d;
+    
 };
