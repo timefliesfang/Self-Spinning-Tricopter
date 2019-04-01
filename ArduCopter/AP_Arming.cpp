@@ -509,7 +509,7 @@ bool AP_Arming_Copter::arm_checks(bool display_failure, bool arming_from_gcs)
         check_failed(ARMING_CHECK_NONE, display_failure, "Waiting for Nav Checks");
         return false;
     }
-
+/**t fcm 0327 -**/
 /*#ifndef ALLOW_ARM_NO_COMPASS
     // check compass health
     if (!_compass.healthy()) {

@@ -111,7 +111,7 @@ void AP_MotorsMatrix::output_to_motors()
 
     // send output to each motor
     for (i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++) {
-        if (motor_enabled[i]) {
+        if (motor_enabled[i]&&(i==0||i==2||i==4) ){
             rc_write(i, motor_out[i]);
         }
     }

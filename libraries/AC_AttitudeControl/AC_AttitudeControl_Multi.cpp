@@ -179,6 +179,12 @@ const AP_Param::GroupInfo AC_AttitudeControl_Multi::var_info[] = {
 
     AP_GROUPINFO("D", 9, AC_AttitudeControl_Multi, d, 0.0f),
 
+    AP_GROUPINFO("C", 10, AC_AttitudeControl_Multi, c, 0.0f),
+
+    AP_GROUPINFO("A_D", 11, AC_AttitudeControl_Multi, dynamic_a, 0.3f),
+
+    AP_GROUPINFO("B_D", 12, AC_AttitudeControl_Multi, dynamic_b, 0.3f),
+
     AP_GROUPEND
 };
 
@@ -273,21 +279,36 @@ void AC_AttitudeControl_Multi::rate_controller_run()
     Vector3f gyro_latest = _ahrs.get_gyro_latest();
     /**t fcm 0318 +**/
     Vector3f motor_in,motor_in_copy,mix;
-    motor_in.x=rate_target_to_motor_roll(0.0f, _rate_target_ang_vel.x);
-    motor_in.y=rate_target_to_motor_pitch(0.0f, _rate_target_ang_vel.y);
-    motor_in.z=rate_target_to_motor_yaw(0.0f, _rate_target_ang_vel.z);
 
-    motor_in_copy.x=rate_target_to_motor_roll_copy(gyro_latest.x, 0.0f);
-    motor_in_copy.y=rate_target_to_motor_pitch_copy(gyro_latest.y, 0.0f);
-    motor_in_copy.z=rate_target_to_motor_yaw_copy(gyro_latest.z, 0.0f);
+    if(_rotation_enable){
+        rate_bf_to_motor_roll_pitch(motor_in,gyro_latest,_rate_target_ang_vel);
+    }
+    if(_rotation_enable_copy){
+        rate_bf_to_motor_roll_pitch_copy(motor_in_copy,gyro_latest,_rate_target_ang_vel);
+    }
+    else if(_rotation_enable==0&&_rotation_enable_copy==0){
+        motor_in.x=rate_target_to_motor_roll(0.0f, _rate_target_ang_vel.x);
+        motor_in.y=rate_target_to_motor_pitch(0.0f, _rate_target_ang_vel.y);
+        motor_in.z=rate_target_to_motor_yaw(0.0f, _rate_target_ang_vel.z);
+
+        motor_in_copy.x=rate_target_to_motor_roll_copy(gyro_latest.x, 0.0f);
+        motor_in_copy.y=rate_target_to_motor_pitch_copy(gyro_latest.y, 0.0f);
+        motor_in_copy.z=rate_target_to_motor_yaw_copy(gyro_latest.z, 0.0f);    
+    }
+    
 
     /*mix.x = a*motor_in.x + b*motor_in_copy.x;
     mix.y = a*motor_in.y + b*motor_in_copy.y;
     mix.z = a*motor_in.z + b*motor_in_copy.z;*/
-
-    mix.x = motor_in.x*cosf(heading + period + d)*a + motor_in.y*sinf(heading + period + d)*a + motor_in_copy.x*b;
-    mix.y =-motor_in.x*sinf(heading + period + d)*a + motor_in.y*cosf(heading + period + d)*a + motor_in_copy.y*b;
-
+    if(_attitude_target_euler_angle.x/M_PI*180>1||_attitude_target_euler_angle.z/M_PI*180>1){
+        mix.x = motor_in.x*cosf(heading + period  +c*gyro_latest.z +d)*(a+dynamic_a) + motor_in.y*sinf(heading + period + c*gyro_latest.z +d)*a + motor_in_copy.x*(b-dynamic_b);
+        mix.y =-motor_in.x*sinf(heading + period + c*gyro_latest.z +d)*(a+dynamic_a) + motor_in.y*cosf(heading + period + c*gyro_latest.z +d)*a + motor_in_copy.y*(b-dynamic_b);    
+    }
+    else{
+        mix.x = motor_in.x*cosf(heading + period  +c*gyro_latest.z +d)*a + motor_in.y*sinf(heading + period + c*gyro_latest.z +d)*a + motor_in_copy.x*b;
+        mix.y =-motor_in.x*sinf(heading + period + c*gyro_latest.z +d)*a + motor_in.y*cosf(heading + period + c*gyro_latest.z +d)*a + motor_in_copy.y*b;
+    }
+    
     float roll1 = motor_in.x*cosf(heading + period + d) + motor_in.y*sinf(heading + period + d);
     float pitch1 =-motor_in.x*sinf(heading + period + d) + motor_in.y*cosf(heading + period + d);
     mix.z = 0.0f;
@@ -350,3 +371,4 @@ void AC_AttitudeControl_Multi::parameter_sanity_check()
         _thr_mix_max.set_and_save(AC_ATTITUDE_CONTROL_MAX_DEFAULT);
     }
 }
+

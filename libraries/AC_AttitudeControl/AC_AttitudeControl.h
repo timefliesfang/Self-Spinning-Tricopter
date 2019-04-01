@@ -305,6 +305,10 @@ protected:
     // Update rate_target_ang_vel using attitude_error_rot_vec_rad
     Vector3f update_ang_vel_target_from_att_error(Vector3f attitude_error_rot_vec_rad);
 
+    void rate_bf_to_motor_roll_pitch(Vector3f& output, Vector3f rate_actual_rads, Vector3f rate_target_rads);
+    
+    void rate_bf_to_motor_roll_pitch_copy(Vector3f& output, Vector3f rate_actual_rads, Vector3f rate_target_rads);
+
     // Run the roll angular velocity PID controller and return the output
     float rate_target_to_motor_roll(float rate_actual_rads, float rate_target_rads);
 
@@ -367,6 +371,10 @@ protected:
     AP_Float            k;
     AP_Float            channel_yaw;
     AP_Int8               _tag;
+    AP_Int8               _rotation_enable;
+    AP_Int8               _rotation_enable_copy;
+    AP_Int8               _rotation_enable_copy;
+
 
     // Intersampling period in seconds
     float               _dt;

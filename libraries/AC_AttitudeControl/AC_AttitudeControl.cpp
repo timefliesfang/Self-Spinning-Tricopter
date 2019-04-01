@@ -151,6 +151,12 @@ const AP_Param::GroupInfo AC_AttitudeControl::var_info[] = {
 
     AP_GROUPINFO("CH_YAW", 24, AC_AttitudeControl, channel_yaw, 1.0f),
 
+    AP_GROUPINFO("I_FF", 25, AC_AttitudeControl, _rotation_enable, 1),
+
+    AP_GROUPINFO("I_FF_C", 26, AC_AttitudeControl, _rotation_enable_copy, 0),
+
+    AP_GROUPINFO("ZHUSHI", 27, AC_AttitudeControl, zhushi, 1),
+
     AP_GROUPEND
 };
 
@@ -582,7 +588,7 @@ void AC_AttitudeControl::attitude_controller_run_quat()
     /**t fcm 0318 +**/
     Quaternion new_coordinate_vehicle_q;
     Quaternion new_coordinate_target_q;
-    Vector3f vehicle_attitude;
+    
     /**t fcm 0318 +end**/
     attitude_vehicle_quat.from_rotation_matrix(_ahrs.get_rotation_body_to_ned());
     /**t fcm 0224 +**/
@@ -627,8 +633,11 @@ void AC_AttitudeControl::attitude_controller_run_quat()
     // Add feedforward term that attempts to ensure that roll and pitch errors rotate with the body frame rather than the reference frame.
     // todo: this should probably be a matrix that couples yaw as well.
     /**t fcm 0318 -**/
-    //_rate_target_ang_vel.x += attitude_error_vector.y * _ahrs.get_gyro().z;
-    //_rate_target_ang_vel.y += -attitude_error_vector.x * _ahrs.get_gyro().z;
+    if(zhushi)
+    {
+        _rate_target_ang_vel.x += attitude_error_vector.y * _ahrs.get_gyro().z;
+        _rate_target_ang_vel.y += -attitude_error_vector.x * _ahrs.get_gyro().z;    
+    }
     /**t fcm 0318 -end**/
     
     ang_vel_limit(_rate_target_ang_vel, radians(_ang_vel_roll_max), radians(_ang_vel_pitch_max), radians(_ang_vel_yaw_max));
@@ -891,6 +900,111 @@ Vector3f AC_AttitudeControl::update_ang_vel_target_from_att_error(Vector3f attit
     // todo: Add Angular Velocity Limit
     return rate_target_ang_vel;
 }
+void AC_AttitudeControl::rate_bf_to_motor_roll_pitch(Vector3f& output, Vector3f rate_actual_rads, Vector3f rate_target_rads)
+{
+    float rate_error_rads_roll = rate_target_rads.x - rate_actual_rads.x;
+    float rate_error_rads_pitch = rate_target_rads.y - rate_actual_rads.y;
+
+    // pass error to PID controller
+    get_rate_roll_pid().set_input_filter_d(rate_error_rads_roll);
+    get_rate_roll_pid().set_desired_rate(rate_target_rads.x);
+
+    get_rate_pitch_pid().set_input_filter_d(rate_error_rads_pitch);
+    get_rate_pitch_pid().set_desired_rate(rate_target_rads.y);
+
+    float integrator_roll = get_rate_roll_pid().get_integrator();
+    float integrator_pitch = get_rate_pitch_pid().get_integrator();
+
+    // Ensure that integrator can only be reduced if the output is saturated
+    if (!_motors.limit.roll_pitch || ((is_positive(integrator_roll) && is_negative(rate_error_rads_roll)) || (is_negative(integrator_roll) && is_positive(rate_error_rads_roll)))) {
+        integrator_roll = get_rate_roll_pid().get_i();
+    }
+    if (!_motors.limit.roll_pitch || ((is_positive(integrator_pitch) && is_negative(rate_error_rads_pitch)) || (is_negative(integrator_pitch) && is_positive(rate_error_rads_pitch)))) {
+        integrator_pitch = get_rate_pitch_pid().get_i();
+    }
+    
+
+    // Compute output in range -1 ~ +1
+    output.x = get_rate_roll_pid().get_p() + integrator_roll + get_rate_roll_pid().get_d() + get_rate_roll_pid().get_ff(rate_target_rads.x);
+    output.y = get_rate_pitch_pid().get_p() + integrator_pitch + get_rate_pitch_pid().get_d() + get_rate_pitch_pid().get_ff(rate_target_rads.y);
+    output.z = 0.0f;
+    
+
+    // Piro-Comp, or Pirouette Compensation is a pre-compensation calculation, which basically rotates the Roll and Pitch Rate I-terms as the
+    // helicopter rotates in yaw.  Much of the built-up I-term is needed to tip the disk into the incoming wind.  Fast yawing can create an instability
+    // as the built-up I-term in one axis must be reduced, while the other increases.  This helps solve that by rotating the I-terms before the error occurs.
+    // It does assume that the rotor aerodynamics and mechanics are essentially symmetrical about the main shaft, which is a generally valid assumption. 
+    if (_rotation_enable){
+
+        int32_t         piro_roll_i, piro_pitch_i;            // used to hold I-terms while doing piro comp
+
+        piro_roll_i  = integrator_roll;
+        piro_pitch_i = integrator_pitch;
+
+        Vector2f yawratevector;
+        yawratevector.x     = cosf(-rate_actual_rads.z * _dt);
+        yawratevector.y     = sinf(-rate_actual_rads.z * _dt);
+        yawratevector.normalize();
+
+        integrator_roll      = piro_roll_i * yawratevector.x - piro_pitch_i * yawratevector.y;
+        integrator_pitch     = piro_pitch_i * yawratevector.x + piro_roll_i * yawratevector.y;
+
+        get_rate_pitch_pid().set_integrator(integrator_pitch);
+        get_rate_roll_pid().set_integrator(integrator_roll);
+    }
+}
+void AC_AttitudeControl::rate_bf_to_motor_roll_pitch_copy(Vector3f& output, Vector3f rate_actual_rads, Vector3f rate_target_rads)
+{
+    float rate_error_rads_roll = rate_target_rads.x - rate_actual_rads.x;
+    float rate_error_rads_pitch = rate_target_rads.y - rate_actual_rads.y;
+
+    // pass error to PID controller
+    get_rate_roll_pid().set_input_filter_d_copy(rate_error_rads_roll);
+    get_rate_roll_pid().set_desired_rate(rate_target_rads.x);
+
+    get_rate_pitch_pid().set_input_filter_d_copy(rate_error_rads_pitch);
+    get_rate_pitch_pid().set_desired_rate(rate_target_rads.y);
+
+    float integrator_roll = get_rate_roll_pid().get_integrator_copy();
+    float integrator_pitch = get_rate_pitch_pid().get_integrator_copy();
+
+    // Ensure that integrator can only be reduced if the output is saturated
+    if (!_motors.limit.roll_pitch || ((is_positive(integrator_roll) && is_negative(rate_error_rads_roll)) || (is_negative(integrator_roll) && is_positive(rate_error_rads_roll)))) {
+        integrator_roll = get_rate_roll_pid().get_i_copy();
+    }
+    if (!_motors.limit.roll_pitch || ((is_positive(integrator_pitch) && is_negative(rate_error_rads_pitch)) || (is_negative(integrator_pitch) && is_positive(rate_error_rads_pitch)))) {
+        integrator_pitch = get_rate_pitch_pid().get_i_copy();
+    }
+    
+
+    // Compute output in range -1 ~ +1
+    output.x = get_rate_roll_pid().get_p_copy() + integrator_roll + get_rate_roll_pid().get_d_copy() + get_rate_roll_pid().get_ff(rate_target_rads.x);
+    output.y = get_rate_pitch_pid().get_p_copy() + integrator_pitch + get_rate_pitch_pid().get_d_copy() + get_rate_pitch_pid().get_ff(rate_target_rads.y);
+    output.z = 0.0f;
+    
+    // Piro-Comp, or Pirouette Compensation is a pre-compensation calculation, which basically rotates the Roll and Pitch Rate I-terms as the
+    // helicopter rotates in yaw.  Much of the built-up I-term is needed to tip the disk into the incoming wind.  Fast yawing can create an instability
+    // as the built-up I-term in one axis must be reduced, while the other increases.  This helps solve that by rotating the I-terms before the error occurs.
+    // It does assume that the rotor aerodynamics and mechanics are essentially symmetrical about the main shaft, which is a generally valid assumption. 
+    if (_rotation_enable_copy){
+
+        int32_t         piro_roll_i, piro_pitch_i;            // used to hold I-terms while doing piro comp
+
+        piro_roll_i  = integrator_roll;
+        piro_pitch_i = integrator_pitch;
+
+        Vector2f yawratevector;
+        yawratevector.x     = cosf(-rate_actual_rads.z * _dt);
+        yawratevector.y     = sinf(-rate_actual_rads.z * _dt);
+        yawratevector.normalize();
+
+        integrator_roll      = piro_roll_i * yawratevector.x - piro_pitch_i * yawratevector.y;
+        integrator_pitch     = piro_pitch_i * yawratevector.x + piro_roll_i * yawratevector.y;
+
+        get_rate_pitch_pid().set_integrator_copy(integrator_pitch);
+        get_rate_roll_pid().set_integrator_copy(integrator_roll);
+    }
+}
 
 // Run the roll angular velocity PID controller and return the output
 float AC_AttitudeControl::rate_target_to_motor_roll(float rate_actual_rads, float rate_target_rads)
@@ -908,9 +1022,10 @@ float AC_AttitudeControl::rate_target_to_motor_roll(float rate_actual_rads, floa
         integrator = get_rate_roll_pid().get_i();
     }
 
+
     // Compute output in range -1 ~ +1
     float output = get_rate_roll_pid().get_p() + integrator + get_rate_roll_pid().get_d() + get_rate_roll_pid().get_ff(rate_target_rads);
-
+    return output;
     // Constrain output
     //return constrain_float(output, -1.0f, 1.0f);
 }
@@ -932,6 +1047,7 @@ float AC_AttitudeControl::rate_target_to_motor_roll_copy(float rate_actual_rads,
 
     // Compute output in range -1 ~ +1
     float output = get_rate_roll_pid().get_p_copy() + integrator + get_rate_roll_pid().get_d_copy() + get_rate_roll_pid().get_ff(rate_target_rads);
+    return output;
 
     // Constrain output
     //return constrain_float(output, -1.0f, 1.0f);
@@ -955,7 +1071,7 @@ float AC_AttitudeControl::rate_target_to_motor_pitch(float rate_actual_rads, flo
 
     // Compute output in range -1 ~ +1
     float output = get_rate_pitch_pid().get_p() + integrator + get_rate_pitch_pid().get_d() + get_rate_pitch_pid().get_ff(rate_target_rads);
-
+    return output;
     // Constrain output
     //return constrain_float(output, -1.0f, 1.0f);
 }
@@ -974,10 +1090,9 @@ float AC_AttitudeControl::rate_target_to_motor_pitch_copy(float rate_actual_rads
     if (!_motors.limit.roll_pitch || ((is_positive(integrator) && is_negative(rate_error_rads)) || (is_negative(integrator) && is_positive(rate_error_rads)))) {
         integrator = get_rate_pitch_pid().get_i_copy();
     }
-
     // Compute output in range -1 ~ +1
     float output = get_rate_pitch_pid().get_p_copy() + integrator + get_rate_pitch_pid().get_d_copy() + get_rate_pitch_pid().get_ff(rate_target_rads);
-
+    return output;
     // Constrain output
     //return constrain_float(output, -1.0f, 1.0f);
 }
@@ -1000,7 +1115,7 @@ float AC_AttitudeControl::rate_target_to_motor_yaw(float rate_actual_rads, float
 
     // Compute output in range -1 ~ +1
     float output = get_rate_yaw_pid().get_p() + integrator + get_rate_yaw_pid().get_d() + get_rate_yaw_pid().get_ff(rate_target_rads);
-
+    return output;
     // Constrain output
     //return constrain_float(output, -1.0f, 1.0f);
 }
@@ -1023,7 +1138,7 @@ float AC_AttitudeControl::rate_target_to_motor_yaw_copy(float rate_actual_rads, 
 
     // Compute output in range -1 ~ +1
     float output = get_rate_yaw_pid().get_p_copy() + integrator + get_rate_yaw_pid().get_d_copy() + get_rate_yaw_pid().get_ff(rate_target_rads);
-
+    return output;
     // Constrain output
     //return constrain_float(output, -1.0f, 1.0f);
 }
