@@ -585,14 +585,18 @@ void AC_AttitudeControl::attitude_controller_run_quat()
     // Retrieve quaternion vehicle attitude
     // TODO add _ahrs.get_quaternion()
     Quaternion attitude_vehicle_quat;
-    /**t fcm 0318 +**/
-    Quaternion new_coordinate_vehicle_q;
-    Quaternion new_coordinate_target_q;
+    // fcm: two new variables calculated under the new coordinate
+    Quaternion new_coordinate_vehicle_q; // store current attitude in new coordinate
+    Quaternion new_coordinate_target_q; // store target attitude in new corrdinate
     
-    /**t fcm 0318 +end**/
     attitude_vehicle_quat.from_rotation_matrix(_ahrs.get_rotation_body_to_ned());
-    /**t fcm 0224 +**/
-    attitude_vehicle_quat.to_euler(vehicle_attitude.x,vehicle_attitude.y,vehicle_attitude.z);
+
+    /**
+    TODO: 1.transfer the attitude calculated in the original code to our new coordinate
+    2.calculate the target angle in our coordinate based on the RC input 
+    3.update target angular velocity based on the error of target and current angle.
+    **/
+    attitude_vehicle_quat.to_euler(vehicle_attitude.x,vehicle_attitude.y,vehicle_attitude.z); 
     new_coordinate_vehicle=transfer_function(vehicle_attitude.x,vehicle_attitude.y,vehicle_attitude.z);
     if(lean_angle>smallest_angle/180*M_PI)
     {
@@ -613,9 +617,7 @@ void AC_AttitudeControl::attitude_controller_run_quat()
     counter1++;
     if(counter1%50==0){
         if(_tag==6)
-            gcs().send_text(MAV_SEVERITY_CRITICAL, "R:%.0f  P:%.0f  Y:%.0f  T_R:%.0f  T_P:%.0f",_attitude_target_euler_angle.x/M_PI*180,_attitude_target_euler_angle.y/M_PI*180,_attitude_target_euler_angle.z/M_PI*180,target_r/M_PI*180,target_p/M_PI*180);
-        
-            //gcs().send_text(MAV_SEVERITY_CRITICAL, "T_R:%.0f  T_P:%.0f",target_r/M_PI*180,target_p/M_PI*180);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "R:%.0f  P:%.0f  Y:%.0f  T_R:%.0f  T_P:%.0f",_attitude_target_euler_angle.x/M_PI*180,_attitude_target_euler_angle.y/M_PI*180,_attitude_target_euler_angle.z/M_PI*180,target_r/M_PI*180,target_p/M_PI*180);                    
     }
     new_coordinate_target_q.from_euler(target_r,target_p,0.0f);
     /**t fcm 0224 +end**/

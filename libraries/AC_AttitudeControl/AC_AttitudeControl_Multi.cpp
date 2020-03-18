@@ -277,7 +277,9 @@ void AC_AttitudeControl_Multi::rate_controller_run()
     // move throttle vs attitude mixing towards desired (called from here because this is conveniently called on every iteration)
     update_throttle_rpy_mix();
     Vector3f gyro_latest = _ahrs.get_gyro_latest();
-    /**t fcm 0318 +**/
+    /** TODO: we modify the rate_controller because the angular velocity in the original code is based on the euler angle coordinate
+    and thus does not apply to our coordinate. Therefore, transformation is necessary    
+    **/
     Vector3f motor_in,motor_in_copy,mix;
 
     if(_rotation_enable){
